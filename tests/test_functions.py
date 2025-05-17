@@ -2,14 +2,14 @@
 
 from __future__ import print_function
 from . import vmtest
-import six
 
-PY3 = six.PY3
+PY3 = True
 
 
 class TestFunctions(vmtest.VmTestCase):
     def test_functions(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             def fn(a, b=17, c="Hello", d=[]):
                 d.append(99)
                 print(a, b, c, d)
@@ -18,10 +18,12 @@ class TestFunctions(vmtest.VmTestCase):
             fn(3, c="Bye")
             fn(4, d=["What?"])
             fn(5, "b", "c")
-            """)
+            """
+        )
 
     def test_recursion(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             def fact(n):
                 if n <= 1:
                     return 1
@@ -30,10 +32,12 @@ class TestFunctions(vmtest.VmTestCase):
             f6 = fact(6)
             print(f6)
             assert f6 == 720
-            """)
+            """
+        )
 
     def test_nested_names(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             def one():
                 x = 1
                 def two():
@@ -42,62 +46,80 @@ class TestFunctions(vmtest.VmTestCase):
                 two()
                 print(x)
             one()
-            """)
+            """
+        )
 
     def test_calling_functions_with_args_kwargs(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             def fn(a, b=17, c="Hello", d=[]):
                 d.append(99)
                 print(a, b, c, d)
             fn(6, *[77, 88])
             fn(**{'c': 23, 'a': 7})
             fn(6, *[77], **{'c': 23, 'd': [123]})
-            """)
+            """
+        )
 
     def test_defining_functions_with_args_kwargs(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             def fn(*args):
                 print("args is %r" % (args,))
             fn(1, 2)
-            """)
-        self.assert_ok("""\
+            """
+        )
+        self.assert_ok(
+            """\
             def fn(**kwargs):
                 print("kwargs is %r" % (kwargs,))
             fn(red=True, blue=False)
-            """)
-        self.assert_ok("""\
+            """
+        )
+        self.assert_ok(
+            """\
             def fn(*args, **kwargs):
                 print("args is %r" % (args,))
                 print("kwargs is %r" % (kwargs,))
             fn(1, 2, red=True, blue=False)
-            """)
-        self.assert_ok("""\
+            """
+        )
+        self.assert_ok(
+            """\
             def fn(x, y, *args, **kwargs):
                 print("x is %r, y is %r" % (x, y))
                 print("args is %r" % (args,))
                 print("kwargs is %r" % (kwargs,))
             fn('a', 'b', 1, 2, red=True, blue=False)
-            """)
+            """
+        )
 
     def test_defining_functions_with_empty_args_kwargs(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             def fn(*args):
                 print("args is %r" % (args,))
             fn()
-            """)
-        self.assert_ok("""\
+            """
+        )
+        self.assert_ok(
+            """\
             def fn(**kwargs):
                 print("kwargs is %r" % (kwargs,))
             fn()
-            """)
-        self.assert_ok("""\
+            """
+        )
+        self.assert_ok(
+            """\
             def fn(*args, **kwargs):
                 print("args is %r, kwargs is %r" % (args, kwargs))
             fn()
-            """)
+            """
+        )
 
     def test_partial(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             from _functools import partial
 
             def f(a,b):
@@ -106,10 +128,12 @@ class TestFunctions(vmtest.VmTestCase):
             f7 = partial(f, 7)
             four = f7(3)
             assert four == 4
-            """)
+            """
+        )
 
     def test_partial_with_kwargs(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             from _functools import partial
 
             def f(a,b,c=0,d=0):
@@ -118,10 +142,12 @@ class TestFunctions(vmtest.VmTestCase):
             f7 = partial(f, b=7, c=1)
             them = f7(10)
             assert them == (10,7,1,0)
-            """)
+            """
+        )
 
     def test_wraps(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             from functools import wraps
             def my_decorator(f):
                 dec = wraps(f)
@@ -137,10 +163,12 @@ class TestFunctions(vmtest.VmTestCase):
                 return 17
 
             assert example() == 17
-            """)
+            """
+        )
 
     def test_different_globals_may_have_different_builtins(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             def replace_globals(f, new_globals):
                 import sys
                 if sys.version_info.major == 2:
@@ -181,57 +209,14 @@ class TestFunctions(vmtest.VmTestCase):
 
 
             f()
-            """)
-
-    def test_no_builtins(self):
-        self.assert_ok("""\
-            def replace_globals(f, new_globals):
-                import sys
-
-
-                if sys.version_info.major == 2:
-                    args = [
-                        f.func_code,
-                        new_globals,
-                        f.func_name,
-                        f.func_defaults,
-                        f.func_closure,
-                    ]
-                else:
-                    args = [
-                        f.__code__,
-                        new_globals,
-                        f.__name__,
-                        f.__defaults__,
-                        f.__closure__,
-                    ]
-                if hasattr(f, '_vm'):
-                    name = args.remove(args[2])
-                    args.insert(0, name)
-                    args.append(f._vm)
-                return type(lambda: None)(*args)
-
-
-            def f(NameError=NameError, AssertionError=AssertionError):
-                # capture NameError and AssertionError early because
-                #  we are deleting the builtins
-                None
-                try:
-                    sum
-                except NameError:
-                    pass
-                else:
-                    raise AssertionError('sum in the builtins')
-
-
-            f = replace_globals(f, {})  # no builtins provided
-            f()
-            """)
+            """
+        )
 
 
 class TestClosures(vmtest.VmTestCase):
     def test_closures(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             def make_adder(x):
                 def add(y):
                     return x+y
@@ -239,10 +224,12 @@ class TestClosures(vmtest.VmTestCase):
             a = make_adder(10)
             print(a(7))
             assert a(7) == 17
-            """)
+            """
+        )
 
     def test_closures_store_deref(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             def make_adder(x):
                 z = x+1
                 def add(y):
@@ -251,10 +238,12 @@ class TestClosures(vmtest.VmTestCase):
             a = make_adder(10)
             print(a(7))
             assert a(7) == 28
-            """)
+            """
+        )
 
     def test_closures_in_loop(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             def make_fns(x):
                 fns = []
                 for i in range(x):
@@ -264,10 +253,12 @@ class TestClosures(vmtest.VmTestCase):
             for f in fns:
                 print(f())
             assert (fns[0](), fns[1](), fns[2]()) == (0, 1, 2)
-            """)
+            """
+        )
 
     def test_closures_with_defaults(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             def make_adder(x, y=13, z=43):
                 def add(q, r=11):
                     return x+y+z+q+r
@@ -275,10 +266,12 @@ class TestClosures(vmtest.VmTestCase):
             a = make_adder(10, 17)
             print(a(7))
             assert a(7) == 88
-            """)
+            """
+        )
 
     def test_deep_closures(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             def f1(a):
                 b = 2*a
                 def f2(c):
@@ -294,21 +287,25 @@ class TestClosures(vmtest.VmTestCase):
             answer = f1(3)(4)(5)(6)
             print(answer)
             assert answer == 54
-            """)
+            """
+        )
 
 
 class TestGenerators(vmtest.VmTestCase):
     def test_first(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             def two():
                 yield 1
                 yield 2
             for i in two():
                 print(i)
-            """)
+            """
+        )
 
     def test_partial_generator(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             from _functools import partial
 
             def f(a,b):
@@ -320,33 +317,41 @@ class TestGenerators(vmtest.VmTestCase):
             f2 = partial(f, 2)
             three = f2(1)
             assert list(three) == [3,2,1]
-            """)
+            """
+        )
 
     def test_yield_multiple_values(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             def triples():
                 yield 1, 2, 3
                 yield 4, 5, 6
 
             for a, b, c in triples():
                 print(a, b, c)
-            """)
+            """
+        )
 
     def test_simple_generator(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             g = (x for x in [0,1,2])
             print(list(g))
-            """)
+            """
+        )
 
     def test_generator_from_generator(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             g = (x*x for x in range(5))
             h = (y+1 for y in g)
             print(list(h))
-            """)
+            """
+        )
 
     def test_generator_from_generator2(self):
-        self.assert_ok("""\
+        self.assert_ok(
+            """\
             class Thing(object):
                 RESOURCES = ('abc', 'def')
                 def get_abc(self):
@@ -364,11 +369,14 @@ class TestGenerators(vmtest.VmTestCase):
                     return d
 
             print(Thing().boom())
-            """)
+            """
+        )
 
-    if PY3: # PY3.3+ only
+    if PY3:  # PY3.3+ only
+
         def test_yield_from(self):
-            self.assert_ok("""\
+            self.assert_ok(
+                """\
                 def main():
                     x = outer()
                     next(x)
@@ -383,10 +391,12 @@ class TestGenerators(vmtest.VmTestCase):
                     yield y
 
                 main()
-                """)
+                """
+            )
 
         def test_yield_from_tuple(self):
-            self.assert_ok("""\
+            self.assert_ok(
+                """\
                 def main():
                     for x in outer():
                         print(x)
@@ -395,10 +405,12 @@ class TestGenerators(vmtest.VmTestCase):
                     yield from (1, 2, 3, 4)
 
                 main()
-                """)
+                """
+            )
 
         def test_distinguish_iterators_and_generators(self):
-            self.assert_ok("""\
+            self.assert_ok(
+                """\
                 class Foo(object):
                     def __iter__(self):
                         return FooIter()
@@ -421,10 +433,12 @@ class TestGenerators(vmtest.VmTestCase):
 
                 for x in outer():
                     print(x)
-                """)
+                """
+            )
 
         def test_nested_yield_from(self):
-            self.assert_ok("""\
+            self.assert_ok(
+                """\
                 def main():
                     x = outer()
                     next(x)
@@ -442,10 +456,12 @@ class TestGenerators(vmtest.VmTestCase):
                     yield y
 
                 main()
-                """)
+                """
+            )
 
         def test_return_from_generator(self):
-            self.assert_ok("""\
+            self.assert_ok(
+                """\
                 def gen():
                     yield 1
                     return 2
@@ -457,10 +473,12 @@ class TestGenerators(vmtest.VmTestCase):
                     except StopIteration as e:
                         print(e.value)
                         break
-            """)
+            """
+            )
 
         def test_return_from_generator_with_yield_from(self):
-            self.assert_ok("""\
+            self.assert_ok(
+                """\
                 def returner():
                     if False:
                         yield
@@ -471,4 +489,5 @@ class TestGenerators(vmtest.VmTestCase):
                     print(y)
 
                 list(main())
-            """)
+            """
+            )

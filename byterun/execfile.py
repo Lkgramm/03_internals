@@ -1,20 +1,24 @@
 """Execute files of Python code."""
 
-import imp
+import importlib.util
 import os
 import sys
 import tokenize
+import types
+import builtins
 
 from .pyvm2 import VirtualMachine
 
 
 # This code is ripped off from coverage.py.  Define things it expects.
 try:
-    open_source = tokenize.open     # pylint: disable=E1101
+    open_source = tokenize.open  # pylint: disable=E1101
 except:
+
     def open_source(fname):
         """Open a source file the best way."""
-        return open(fname, "rU")
+        return open(fname, "r", encoding="utf-8")
+
 
 NoSource = Exception
 
@@ -26,12 +30,7 @@ def exec_code_object(code, env):
 
 # from coverage.py:
 
-try:
-    # In Py 2.x, the builtins were in __builtin__
-    BUILTINS = sys.modules['__builtin__']
-except KeyError:
-    # In Py 3.x, they're in builtins
-    BUILTINS = sys.modules['builtins']
+BUILTINS = builtins.__dict__
 
 
 def rsplit1(s, sep):
@@ -54,29 +53,36 @@ def run_python_module(modulename, args):
         try:
             # Search for the module - inside its parent package, if any - using
             # standard import mechanics.
-            if '.' in modulename:
-                packagename, name = rsplit1(modulename, '.')
-                package = __import__(packagename, glo, loc, ['__path__'])
+            if "." in modulename:
+                packagename, name = rsplit1(modulename, ".")
+                package = __import__(packagename, glo, loc, ["__path__"])
                 searchpath = package.__path__
             else:
                 packagename, name = None, modulename
-                searchpath = None  # "top-level search" in imp.find_module()
-            openfile, pathname, _ = imp.find_module(name, searchpath)
+                searchpath = None  # "top-level search" in importlib.util.find_module()
+            openfile, pathname, _ = importlib.util.find_module(name, searchpath)
 
             # Complain if this is a magic non-file module.
             if openfile is None and pathname is None:
-                raise NoSource(
-                    "module does not live in a file: %r" % modulename
-                    )
+                raise NoSource("module does not live in a file: %r" % modulename)
 
             # If `modulename` is actually a package, not a mere module, then we
             # pretend to be Python 2.7 and try running its __main__.py script.
             if openfile is None:
                 packagename = modulename
-                name = '__main__'
-                package = __import__(packagename, glo, loc, ['__path__'])
+                name = "__main__"
+                package = __import__(packagename, glo, loc, ["__path__"])
                 searchpath = package.__path__
-                openfile, pathname, _ = imp.find_module(name, searchpath)
+                spec = importlib.util.find_spec(name, searchpath)
+                if spec is None:
+                    raise NoSource(f"module does not live in a file: {modulename!r}")
+
+                if spec.origin == "built-in":
+                    raise NoSource(
+                        f"module {modulename!r} is built-in and has no source"
+                    )
+
+                pathname = spec.origin
         except ImportError:
             _, err, _ = sys.exc_info()
             raise NoSource(str(err))
@@ -99,20 +105,20 @@ def run_python_file(filename, args, package=None):
 
     """
     # Create a module to serve as __main__
-    old_main_mod = sys.modules['__main__']
-    main_mod = imp.new_module('__main__')
-    sys.modules['__main__'] = main_mod
+    old_main_mod = sys.modules["__main__"]
+    main_mod = types.ModuleType("__main__")
+    sys.modules["__main__"] = main_mod
     main_mod.__file__ = filename
     if package:
         main_mod.__package__ = package
-    main_mod.__builtins__ = BUILTINS
+    main_mod.__builtins__ = builtins
 
     # Set sys.argv and the first path element properly.
     old_argv = sys.argv
     old_path0 = sys.path[0]
     sys.argv = args
     if package:
-        sys.path[0] = ''
+        sys.path[0] = ""
     else:
         sys.path[0] = os.path.abspath(os.path.dirname(filename))
 
@@ -130,15 +136,15 @@ def run_python_file(filename, args, package=None):
 
         # We have the source.  `compile` still needs the last line to be clean,
         # so make sure it is, then compile a code object from it.
-        if not source or source[-1] != '\n':
-            source += '\n'
+        if not source or source[-1] != "\n":
+            source += "\n"
         code = compile(source, filename, "exec")
 
         # Execute the source file.
         exec_code_object(code, main_mod.__dict__)
     finally:
         # Restore the old __main__
-        sys.modules['__main__'] = old_main_mod
+        sys.modules["__main__"] = old_main_mod
 
         # Restore the old argv and path
         sys.argv = old_argv
