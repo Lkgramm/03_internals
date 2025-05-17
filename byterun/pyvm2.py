@@ -229,6 +229,7 @@ class VirtualMachine(object):
                 "LIST_EXTEND",
                 "CHECK_EXC_MATCH",
                 "BEFORE_ASYNC_WITH",
+                'LOAD_METHOD'
             ):
                 return None
             else:
